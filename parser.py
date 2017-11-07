@@ -10,7 +10,11 @@ api = osmapi.OsmApi()
 
 lat, lon = 34.051491, -84.071297
 
-starting_coord = (lon, lat)
+starting_coord = (lon - 0.001, lat + 0.001)
+
+notable_coords = []
+dist = 10 # km
+time = 60 # minutes
 
 box_width = 0.005
 box_height = 0.005
@@ -21,6 +25,27 @@ min_lat = lat - (box_height/2)
 max_lon = lon + (box_width/2)
 max_lat = lat + (box_height/2)
 
+def draw_paths_mpl(lines, line_colors, points=[], point_colors=[]):
+    fig, ax = pl.subplots()
+    lc = mc.LineCollection(lines, colors=line_colors, linewidths=2)
+
+    pts = mc.RegularPolyCollection(
+            numsides=6,
+            rotation=0,
+            sizes=(50,),
+            facecolors = point_colors,
+            edgecolors = (0,0,0,1), 
+            offsets=points,
+            transOffset = ax.transData,
+            )
+    
+    ax.add_collection(lc)
+    ax.add_collection(pts)
+    ax.autoscale()
+    ax.margins(0.1)
+
+    pl.show()
+
 def convert_to_xy(coord):
     (lon, lat) = coord
     radius = 6371 # km
@@ -30,14 +55,11 @@ def convert_to_xy(coord):
     return (x,y)
 
 def get_dist(coord1, coord2):
-    dist = 0
-    return dist
+    return math.sqrt((coord1[0] - coord2[0])**2 + (coord1[1] - coord2[1])**2)
 
 def get_nearest_node(starting_coord, nodes):
     '''Returns the nearest node based on longitue latitude coords '''
-    return min(nodes, key=lambda x: )
-
-    pass
+    return min(nodes, key=lambda x: get_dist((starting_coord), (x['data']['lon'], x['data']['lat'])))
 
 def get_neighbors(node, ways):
     ''' Finds the degree of a node along with the nodes that are adjacent (neighbors) '''
@@ -49,7 +71,7 @@ def get_neighbors(node, ways):
 
     neighbor_nodes = set()
 
-    for i in nd_ways 
+    for i in nd_ways: 
         pos = i['data']['nd'].index(node_id)
 
         try:
@@ -65,23 +87,21 @@ def get_neighbors(node, ways):
 
 def get_path(starting_coord, nodes, ways):
     ''' This should return a list of nodes that make up the path '''
-    
     pass
 
 raw_data = api.Map(min_lon, min_lat, max_lon, max_lat)
-
-
-print('total data amount:', len(raw_data))
 
 nodes = list(filter(lambda raw_data: raw_data['type'] == 'node', raw_data))
 ways = list(filter(lambda raw_data: raw_data['type'] == 'way' and 'highway' in raw_data['data']['tag'], raw_data))
 relations = list(filter(lambda raw_data: raw_data['type'] == 'relation', raw_data))
 
+print('total data amount:', len(raw_data))
 print('Number of nodes:', len(nodes))
 print('Number of ways:', len(ways))
 print('Number of relations:', len(relations))
 
-walkable_tags = ['secondary',
+walkable_tags = [
+        'secondary',
         'tertiary',
         'unclassified',
         'residential',
@@ -94,32 +114,23 @@ walkable_tags = ['secondary',
         'footway',
         'bridleway',
         'steps',
-        'path']
-
-def draw_paths_mpl(lines, colors):
-    lc = mc.LineCollection(lines, colors=colors, linewidths=2)
-
-    fig, ax = pl.subplots()
-    ax.add_collection(lc)
-    ax.autoscale()
-    ax.margins(0.1)
-
-    pl.show()
+        'path'
+        ]
 
 walkable_ways = list(filter(lambda ways: ways['data']['tag']['highway'] in walkable_tags, ways))
+
+print('Number of walkable ways:', len(walkable_ways))
 
 lines = []
 colors = []
 
-for i in walkable_ways:
-    print(i)
-    print()
+points = []
+pt_colors = []
+
+for i in ways:
     node_list = i['data']['nd']
     
-    print(node_list)
-    print()
-   
-    c = (random(), random(), random())
+    c = (random() * 0.25, random(), random())
     
     for j in range(len(node_list)):
         try:
@@ -137,5 +148,16 @@ for i in walkable_ways:
 
         lines.append((prev_coord, next_coord))
         colors.append(c)
-        
-draw_paths_mpl(lines, colors)
+
+starting_node = get_nearest_node(starting_coord, nodes)
+
+starting_xy = convert_to_xy(starting_coord)
+starting_node_xy = convert_to_xy((starting_node['data']['lon'], starting_node['data']['lat']))
+
+lines.append((starting_xy, starting_node_xy))
+colors.append((1,0,0))
+
+points.append(starting_xy)
+pt_colors.append((1,1,0))
+
+draw_paths_mpl(lines, colors, points, pt_colors)
