@@ -85,35 +85,54 @@ def get_neighbors(node, ways):
 
     return list(neighbor_nodes)
 
-def get_path(starting_coord, nodes, ways):
-    ''' This should return a list of node objects that make up the path '''
+def get_leg(starting_node, nodes, ways):
+    ''' This should return a list of node objects that make up the leg of a path '''
 
-    # This is just a list of nodes representing the path.
-    # The path should contain duplicate nodes when that node is visited twice
-    path = []
+    # The path is made up of several legs
+    leg = []
 
-    starting_node = get_nearest_node(starting_coord, nodes)
-    path.append(starting_node)
+    # starting_node = get_nearest_node(starting_coord, nodes)
+    leg.append(starting_node)
 
+    leg_finished = False
 
-    current_index = path[0]
-    previous_node = None
-
-    changes_made = True
-    while changes_made:
+    while not(leg_finished):
         
-        current_node = path[current_index]
+        current_node = leg[-1]
         
         neighbor_ids = get_neighbors(current_node, ways)
 
-        degree = len(neighbor_ids)
+        neighbors = list(filter(lambda nodes: nodes['data']['id'] in neighbor_ids, nodes))
+        
+        # This should get rid of any neighbors that already show up on the leg of the journey (not the overall path)
+        if leg[0] in neighbors:
+            neighbors = [x for x in neighbors if x not in leg]
+            neighbors.append(leg[0]) # need to add back starting node that got removed from neighbors
+        else:
+            neighbors = [x for x in neighbors if x not in leg]
 
+        neighbors = sorted(neighbors, key=lambda x: x['data']['id']) 
+        
+        degree = len(neighbors)
+
+        if degree == 0:
+            leg_finished = True
+            break
+        
         if degree % 2 != 0:
             # TODO: Consider the odd degree
             pass
 
-        previous_node = current_node
-        current_index += 1
+        next_node = neighbors[0]
+
+        leg.append(next_node)
+
+    return leg
+
+def get_path(starting_node, nodes, ways):
+    ''' This should returnn a list of node objects that make up the path '''
+
+    path = []
 
     return path
 
@@ -149,6 +168,9 @@ walkable_ways = list(filter(lambda ways: ways['data']['tag']['highway'] in walka
 
 print('Number of walkable ways:', len(walkable_ways))
 
+starting_node = get_nearest_node(starting_coord, nodes)
+
+leg = get_leg(starting_node, nodes, ways)
 
 
 ###################### Everything From this point on is for the purposes of drawing #####################
@@ -158,6 +180,14 @@ colors = []
 points = []
 pt_colors = []
 
+print ('THE LEG')
+
+for i in leg:
+    print(i)
+    print()
+    coord = convert_to_xy((i['data']['lon'],i['data']['lat']))
+    points.append(coord)
+    pt_colors.append((0,0,1))
 for i in ways:
     node_list = i['data']['nd']
     
@@ -180,7 +210,6 @@ for i in ways:
         lines.append((prev_coord, next_coord))
         colors.append(c)
 
-starting_node = get_nearest_node(starting_coord, nodes)
 
 starting_xy = convert_to_xy(starting_coord)
 starting_node_xy = convert_to_xy((starting_node['data']['lon'], starting_node['data']['lat']))
