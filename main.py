@@ -52,7 +52,7 @@ def convert_to_xy(coord):
     theta = (max_lat + min_lat)/2
     x = float(lon) * radius * math.pi / 180 * math.cos(theta * math.pi / 180)
     y = float(lat) * radius * math.pi / 180
-    return (x,y)
+    return [x,y]
 
 def get_dist(coord1, coord2):
     return math.sqrt((coord1[0] - coord2[0])**2 + (coord1[1] - coord2[1])**2)
@@ -96,6 +96,8 @@ def get_leg(starting_node, nodes, ways):
 
     leg_finished = False
 
+    prev_node = None
+    # TODO: THIS IS BROKEN
     while not(leg_finished):
         
         current_node = leg[-1]
@@ -103,15 +105,22 @@ def get_leg(starting_node, nodes, ways):
         neighbor_ids = get_neighbors(current_node, ways)
 
         neighbors = list(filter(lambda nodes: nodes['data']['id'] in neighbor_ids, nodes))
-        
-        # This should get rid of any neighbors that already show up on the leg of the journey (not the overall path)
-        if leg[0] in neighbors:
-            neighbors = [x for x in neighbors if x not in leg]
-            neighbors.append(leg[0]) # need to add back starting node that got removed from neighbors
-        else:
-            neighbors = [x for x in neighbors if x not in leg]
+       
+        if prev_node is not None:
+            try:
+                neighbors.remove(prev_node)
+            except:
+                pass
+        # # This should get rid of any neighbors that already show up on the leg of the journey (not the overall path)
+        # if leg[0] in neighbors and :
+        #     neighbors = [x for x in neighbors if x not in leg]
+        #     neighbors.append(leg[0]) # need to add back starting node that got removed from neighbors
+        # else:
+        #     neighbors = [x for x in neighbors if x not in leg]
 
-        neighbors = sorted(neighbors, key=lambda x: x['data']['id']) 
+        from random import shuffle
+        shuffle(neighbors)
+        #neighbors = sorted(neighbors, key=lambda x: x['data']['id']) 
         
         degree = len(neighbors)
 
@@ -124,6 +133,7 @@ def get_leg(starting_node, nodes, ways):
             pass
 
         next_node = neighbors[0]
+        prev_node = current_node
 
         leg.append(next_node)
 
@@ -182,12 +192,19 @@ pt_colors = []
 
 print ('THE LEG')
 
+q = 0
+w = 1/len(leg)
 for i in leg:
     print(i)
     print()
     coord = convert_to_xy((i['data']['lon'],i['data']['lat']))
+    q += w
+    if q > 1:
+        q = 1
+    coord[0] += q/5
     points.append(coord)
-    pt_colors.append((0,0,1))
+    pt_colors.append((0,0,q, q))
+
 for i in ways:
     node_list = i['data']['nd']
     
