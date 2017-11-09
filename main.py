@@ -85,6 +85,24 @@ def get_neighbors(node, ways):
 
     return list(neighbor_nodes)
 
+def a_star_path(start_node, end_node, nodes, ways):
+    ''' Returns a list of node objects that make up a path between two points''' 
+    path = []
+
+
+    queue = []
+    queue.append(start_node)
+
+    while False:#queue[-1] is not end_node:
+        current_node = queue[0]
+        neighbor_ids = get_neighbors(current_node, ways)
+
+        neighbors = list(filter(lambda nodes: nodes['data']['id'] in neighbor_ids, nodes))
+    
+    path.append(end_node)
+
+    return path
+
 def get_leg(starting_node, nodes, ways):
     ''' This should return a list of node objects that make up the leg of a path '''
 
@@ -105,12 +123,18 @@ def get_leg(starting_node, nodes, ways):
         neighbor_ids = get_neighbors(current_node, ways)
 
         neighbors = list(filter(lambda nodes: nodes['data']['id'] in neighbor_ids, nodes))
-       
-        if prev_node is not None:
+      
+        try:
+            neighbors = [x for x in neighbors if x not in current_node['explored_neighbors']]
+        except KeyError:
+            pass
+
+        if prev_node is not None and len(neighbors) > 1:
             try:
                 neighbors.remove(prev_node)
-            except:
+            except ValueError:
                 pass
+
         # # This should get rid of any neighbors that already show up on the leg of the journey (not the overall path)
         # if leg[0] in neighbors and :
         #     neighbors = [x for x in neighbors if x not in leg]
@@ -118,9 +142,7 @@ def get_leg(starting_node, nodes, ways):
         # else:
         #     neighbors = [x for x in neighbors if x not in leg]
 
-        from random import shuffle
-        shuffle(neighbors)
-        #neighbors = sorted(neighbors, key=lambda x: x['data']['id']) 
+        neighbors = sorted(neighbors, key=lambda x: x['data']['id']) 
         
         degree = len(neighbors)
 
@@ -128,21 +150,59 @@ def get_leg(starting_node, nodes, ways):
             leg_finished = True
             break
         
-        if degree % 2 != 0:
-            # TODO: Consider the odd degree
-            pass
-
         next_node = neighbors[0]
         prev_node = current_node
 
-        leg.append(next_node)
+        if degree % 2 != 0:
+            try:
+                if next_node['odd'] is False:
+                    leg.append(next_node)
+                    continue
+            except KeyError:
+                next_node['odd'] = True
 
+            odd_start = None
+            odd_end = None
+    
+            for i in reversed(leg):
+                try:
+                    if i['odd'] is True:
+                        odd_end = i
+    
+                    odd_start = next_node
+    
+                except KeyError:
+                    pass
+
+            if odd_start is not None and odd_end is not None:
+                odd_path = a_star_path (odd_start, odd_end, nodes, ways)
+                odd_start['odd'] = False
+                odd_end['odd'] = False
+                
+                leg.extend(odd_path)
+                continue
+        
+        try:
+            current_node['explored_neighbors'].append(next_node)
+        except KeyError:
+            current_node['explored_neighbors'] = []
+            current_node['explored_neighbors'].append(next_node)
+
+        print(len(leg))
+        leg.append(next_node)
+        
     return leg
 
 def get_path(starting_node, nodes, ways):
     ''' This should returnn a list of node objects that make up the path '''
 
     path = []
+
+    starting_leg = get_leg(starting_node, nodes, ways)
+
+    while True:
+       pass 
+
 
     return path
 
