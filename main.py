@@ -11,6 +11,7 @@ api = osmapi.OsmApi()
 lat, lon = 34.051491, -84.071297
 
 starting_coord = (lon - 0.001, lat + 0.001)
+end_coord = (lon + 0.001 , lat  - 0.001)
 
 notable_coords = []
 dist = 10 # km
@@ -52,7 +53,7 @@ def convert_to_xy(coord):
     theta = (max_lat + min_lat)/2
     x = float(lon) * radius * math.pi / 180 * math.cos(theta * math.pi / 180)
     y = float(lat) * radius * math.pi / 180
-    return [x,y]
+    return [x,y]  
 
 def get_dist(coord1, coord2):
     return math.sqrt((coord1[0] - coord2[0])**2 + (coord1[1] - coord2[1])**2)
@@ -86,20 +87,66 @@ def get_neighbors(node, ways):
     return list(neighbor_nodes)
 
 def a_star_path(start_node, end_node, nodes, ways):
-    ''' Returns a list of node objects that make up a path between two points''' 
+    ''' Returns a list of node ids that make up a path between two points''' 
     path = []
 
+    if start_node == end_node:
+        return [start_node]
 
     queue = []
+    start_node['dist'] = 0
     queue.append(start_node)
 
-    while False:#queue[-1] is not end_node:
+    end_coord = convert_to_xy((end_node['data']['lon'], end_node['data']['lat']))
+
+    finished = []
+
+    while queue[0] is not end_node:
         current_node = queue[0]
+        current_coord = convert_to_xy((current_node['data']['lat'], current_node['data']['lon']))
+        
         neighbor_ids = get_neighbors(current_node, ways)
 
         neighbors = list(filter(lambda nodes: nodes['data']['id'] in neighbor_ids, nodes))
-    
+        for i in neighbors:
+            coord = convert_to_xy((i['data']['lon'], i['data']['lat']))
+           
+
+            new_dist  = get_dist(coord, current_coord) + current_node['dist']
+            try:
+                if new_dist < i['dist']:
+                    i['dist'] = new_dist
+                    i['prev_node'] = current_node
+            except KeyError:
+                i['dist'] = new_dist
+                i['prev_node'] = current_node
+            
+            
+            try:
+                i['end_dist']
+            except KeyError:
+                i['end_dist'] = get_dist(coord, end_coord)
+
+            i['comb_heur'] = i['end_dist'] + i['dist']
+
+
+        neighbors = sorted(neighbors, key=lambda x: x['comb_heur']) 
+
+        queue.extend(neighbors)
+
+        finished.append(current_node)
+
+        queue.remove(current_node)
+        queue = [x for x in queue if x not in finished]
+        queue = sorted(queue, key = lambda x: x['comb_heur'])
+        print('hey', len(queue))
+
     path.append(end_node)
+    
+    while path[-1] is not start_node:
+        path.append(path[-1]['prev_node'])
+
+    path = list(reversed(path))
 
     return path
 
@@ -115,7 +162,6 @@ def get_leg(starting_node, nodes, ways):
     leg_finished = False
 
     prev_node = None
-    # TODO: THIS IS BROKEN
     while not(leg_finished):
         
         current_node = leg[-1]
@@ -210,6 +256,18 @@ raw_data = api.Map(min_lon, min_lat, max_lon, max_lat)
 
 nodes = list(filter(lambda raw_data: raw_data['type'] == 'node', raw_data))
 ways = list(filter(lambda raw_data: raw_data['type'] == 'way' and 'highway' in raw_data['data']['tag'], raw_data))
+
+# This filters it so that only node that are on roads get counted
+nodes_on_way = set()
+for i in ways:
+    for j in i['data']['nd']:
+        nodes_on_way.add(j)
+
+nodes_on_way = list(nodes_on_way)
+
+nodes = list(filter (lambda nodes: nodes['data']['id'] in nodes_on_way, nodes))
+
+
 relations = list(filter(lambda raw_data: raw_data['type'] == 'relation', raw_data))
 
 print('total data amount:', len(raw_data))
@@ -239,14 +297,12 @@ walkable_ways = list(filter(lambda ways: ways['data']['tag']['highway'] in walka
 print('Number of walkable ways:', len(walkable_ways))
 
 starting_node = get_nearest_node(starting_coord, nodes)
+end_node = get_nearest_node(end_coord, nodes)
 
 leg = get_leg(starting_node, nodes, ways)
 
-
-###################### Everything From this point on is for the purposes of drawing #####################
 lines = []
 colors = []
-
 points = []
 pt_colors = []
 
@@ -287,6 +343,12 @@ for i in ways:
         lines.append((prev_coord, next_coord))
         colors.append(c)
 
+for i in range(len(points)):
+    try:
+        lines.append((points[i], points[i+1]))
+        colors.append((0,1,1))
+    except:
+        continue
 
 starting_xy = convert_to_xy(starting_coord)
 starting_node_xy = convert_to_xy((starting_node['data']['lon'], starting_node['data']['lat']))
@@ -296,5 +358,6 @@ colors.append((1,0,0))
 
 points.append(starting_xy)
 pt_colors.append((1,1,0))
+
 
 draw_paths_mpl(lines, colors, points, pt_colors)
