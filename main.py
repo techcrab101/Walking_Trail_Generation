@@ -10,8 +10,8 @@ api = osmapi.OsmApi()
 
 lat, lon = 34.051491, -84.071297
 
-starting_coord = (lon - 0.001, lat + 0.001)
-end_coord = (lon + 0.001 , lat  - 0.001)
+end_coord = (lon - 0.001, lat + 0.001)
+starting_coord = (lon + 0.001 , lat  - 0.001)
 
 notable_coords = []
 dist = 10 # km
@@ -157,85 +157,61 @@ def get_leg(starting_node, nodes, ways):
     leg = []
 
     # starting_node = get_nearest_node(starting_coord, nodes)
+    starting_node ['prev_leg_neighbor'] = set()
     leg.append(starting_node)
 
     leg_finished = False
 
-    prev_node = None
+    just_started = True
     while not(leg_finished):
         
         current_node = leg[-1]
         
         neighbor_ids = get_neighbors(current_node, ways)
-
         neighbors = list(filter(lambda nodes: nodes['data']['id'] in neighbor_ids, nodes))
-      
-        try:
-            neighbors = [x for x in neighbors if x not in current_node['explored_neighbors']]
-        except KeyError:
-            pass
-
-        if prev_node is not None and len(neighbors) > 1:
-            try:
-                neighbors.remove(prev_node)
-            except ValueError:
-                pass
-
-        # # This should get rid of any neighbors that already show up on the leg of the journey (not the overall path)
-        # if leg[0] in neighbors and :
-        #     neighbors = [x for x in neighbors if x not in leg]
-        #     neighbors.append(leg[0]) # need to add back starting node that got removed from neighbors
-        # else:
-        #     neighbors = [x for x in neighbors if x not in leg]
 
         neighbors = sorted(neighbors, key=lambda x: x['data']['id']) 
-        
         degree = len(neighbors)
-
-        if degree == 0:
-            leg_finished = True
-            break
         
-        next_node = neighbors[0]
-        prev_node = current_node
+        print('degree', degree)
 
         if degree % 2 != 0:
             try:
-                if next_node['odd'] is False:
-                    leg.append(next_node)
-                    continue
-            except KeyError:
-                next_node['odd'] = True
-
-            odd_start = None
-            odd_end = None
-    
-            for i in reversed(leg):
-                try:
-                    if i['odd'] is True:
-                        odd_end = i
-    
-                    odd_start = next_node
-    
-                except KeyError:
+                if current_node['odd'] == False:
                     pass
+            except KeyError:
+                current_node['odd'] = True
 
-            if odd_start is not None and odd_end is not None:
-                odd_path = a_star_path (odd_start, odd_end, nodes, ways)
-                odd_start['odd'] = False
-                odd_end['odd'] = False
-                
-                leg.extend(odd_path)
-                continue
-        
+
+        neighbors = [x for x in neighbors if x['data']['id'] not in list(current_node['prev_leg_neighbor'])]
+
+        if len(neighbors) == 0:
+            print('no more neighbors')
+            leg_finished = True
+            break
+
         try:
-            current_node['explored_neighbors'].append(next_node)
+            neighbors[0]['prev_leg_neighbor'].add(current_node['data']['id'])
         except KeyError:
-            current_node['explored_neighbors'] = []
-            current_node['explored_neighbors'].append(next_node)
+            neighbors[0]['prev_leg_neighbor'] = set()
+            neighbors[0]['prev_leg_neighbor'].add(current_node['data']['id'])
 
-        print(len(leg))
+        next_node = neighbors[0] 
+
+        print('prev node:', current_node['prev_leg_neighbor'])
+        print('current node:', current_node['data']['id'])
+        print('next node:', next_node['data']['id'])
         leg.append(next_node)
+
+        print('len of leg', len(leg))
+        print()
+
+        if current_node['data']['id'] is starting_node['data']['id'] and not(just_started):
+            print('current is starting')
+            leg_finished = True
+            break
+
+        just_started = False
         
     return leg
 
@@ -317,7 +293,6 @@ for i in leg:
     q += w
     if q > 1:
         q = 1
-    coord[0] += q/5
     points.append(coord)
     pt_colors.append((0,0,q, q))
 
@@ -346,7 +321,7 @@ for i in ways:
 for i in range(len(points)):
     try:
         lines.append((points[i], points[i+1]))
-        colors.append((0,1,1))
+        colors.append((1,0,0))
     except:
         continue
 
