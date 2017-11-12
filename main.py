@@ -1,6 +1,7 @@
 import osmapi
 
 import math
+import time
 from random import random
 
 import pylab as pl
@@ -10,12 +11,12 @@ api = osmapi.OsmApi()
 
 lat, lon = 34.051491, -84.071297
 
-end_coord = (lon - 0.001, lat + 0.001)
-starting_coord = (lon + 0.001 , lat  - 0.001)
+starting_coord = (-84.0736408, 34.0522912)#(lon - 0.001, lat + 0.001)
+end_coord = (-84.0843963, 34.0447567)#(lon + 0.001 , lat  - 0.001)
 
 notable_coords = []
 dist = 10 # km
-time = 60 # minutes
+time_ = 60 # minutes
 
 box_width = 0.005
 box_height = 0.005
@@ -87,7 +88,7 @@ def get_neighbors(node, ways):
     return list(neighbor_nodes)
 
 def a_star_path(start_node, end_node, nodes, ways):
-    ''' Returns a list of node ids that make up a path between two points''' 
+    ''' Returns a list of node objs that make up a path between two points''' 
     path = []
 
     if start_node == end_node:
@@ -108,11 +109,23 @@ def a_star_path(start_node, end_node, nodes, ways):
         neighbor_ids = get_neighbors(current_node, ways)
 
         neighbors = list(filter(lambda nodes: nodes['data']['id'] in neighbor_ids, nodes))
+
+        print('current node id:', current_node['data']['id'])
+        print('neighbor ids:', neighbor_ids)
+        print()
+
         for i in neighbors:
             coord = convert_to_xy((i['data']['lon'], i['data']['lat']))
            
 
             new_dist  = get_dist(coord, current_coord) + current_node['dist']
+
+            try:
+                i['prev_node']
+            except KeyError:
+                i['prev_node'] = current_node
+
+
             try:
                 if new_dist < i['dist']:
                     i['dist'] = new_dist
@@ -145,6 +158,8 @@ def a_star_path(start_node, end_node, nodes, ways):
     
     while path[-1] is not start_node:
         path.append(path[-1]['prev_node'])
+        print('path i:', path[-1]['data']['id'])
+        time.sleep(1)
 
     path = list(reversed(path))
 
@@ -163,8 +178,13 @@ def get_leg(starting_node, nodes, ways):
     leg_finished = False
 
     just_started = True
+
+    odds_found = False
+    first_odd = None
+    second_odd = None
     while not(leg_finished):
         
+        odds_found = False
         current_node = leg[-1]
         
         neighbor_ids = get_neighbors(current_node, ways)
@@ -177,34 +197,68 @@ def get_leg(starting_node, nodes, ways):
 
         if degree % 2 != 0:
             try:
-                if current_node['odd'] == False:
-                    pass
+                current_node['odd']
             except KeyError:
                 current_node['odd'] = True
+            
+            if first_odd is None and current_node['odd'] == True:
+                first_odd = current_node
+            elif current_node['odd'] == True:
+                second_odd = current_node
+
+                print('first odd:', first_odd)
+                print()
+                print('second odd:', second_odd)
+                print()
+
+                odd_path = a_star_path(first_odd, second_odd, nodes, ways)
+                
+                first_odd['odd'] = False
+                second_odd['odd'] = False
+                
+                first_odd = None
+                second_odd = None
+
+                print('len of odd path:', len(odd_path))
+                print('odd path:', odd_path)
 
 
-        neighbors = [x for x in neighbors if x['data']['id'] not in list(current_node['prev_leg_neighbor'])]
+                for i in range(len(odd_path)):
+                    try:
+                        odd_path[i]['prev_leg_neighbor'].add(odd_path[i-1]['data']['id'])
+                    except KeyError:
+                        odd_path[i]['prev_leg_neighbor'] = set()
+                    except IndexError:
+                        pass
 
-        if len(neighbors) == 0:
-            print('no more neighbors')
-            leg_finished = True
-            break
+                odds_found = True
 
-        try:
-            neighbors[0]['prev_leg_neighbor'].add(current_node['data']['id'])
-        except KeyError:
-            neighbors[0]['prev_leg_neighbor'] = set()
-            neighbors[0]['prev_leg_neighbor'].add(current_node['data']['id'])
-
-        next_node = neighbors[0] 
-
-        print('prev node:', current_node['prev_leg_neighbor'])
-        print('current node:', current_node['data']['id'])
-        print('next node:', next_node['data']['id'])
-        leg.append(next_node)
-
-        print('len of leg', len(leg))
-        print()
+        if not(odds_found):
+            neighbors = [x for x in neighbors if x['data']['id'] not in list(current_node['prev_leg_neighbor'])]
+    
+            if len(neighbors) == 0:
+                print('no more neighbors')
+                leg_finished = True
+                break
+    
+            try:
+                neighbors[0]['prev_leg_neighbor'].add(current_node['data']['id'])
+            except KeyError:
+                neighbors[0]['prev_leg_neighbor'] = set()
+                neighbors[0]['prev_leg_neighbor'].add(current_node['data']['id'])
+    
+            next_node = neighbors[0] 
+    
+            print('prev node:', current_node['prev_leg_neighbor'])
+            print('current node:', current_node['data']['id'])
+            print('next node:', next_node['data']['id'])
+            leg.append(next_node)
+    
+            print('len of leg', len(leg))
+            print()
+    
+        else:
+            leg.extend(odd_path)
 
         if current_node['data']['id'] is starting_node['data']['id'] and not(just_started):
             print('current is starting')
@@ -212,7 +266,7 @@ def get_leg(starting_node, nodes, ways):
             break
 
         just_started = False
-        
+        time.sleep(0.5)
     return leg
 
 def get_path(starting_node, nodes, ways):
@@ -275,7 +329,13 @@ print('Number of walkable ways:', len(walkable_ways))
 starting_node = get_nearest_node(starting_coord, nodes)
 end_node = get_nearest_node(end_coord, nodes)
 
-leg = get_leg(starting_node, nodes, ways)
+print('starting node:', starting_node)
+print()
+print('ending node:', end_node)
+print()
+
+
+leg = a_star_path(starting_node, end_node, nodes, ways) #get_leg(starting_node, nodes, ways)
 
 lines = []
 colors = []
@@ -328,11 +388,19 @@ for i in range(len(points)):
 starting_xy = convert_to_xy(starting_coord)
 starting_node_xy = convert_to_xy((starting_node['data']['lon'], starting_node['data']['lat']))
 
+end_xy = convert_to_xy(end_coord)
+end_node_xy = convert_to_xy((end_node['data']['lon'], end_node['data']['lat']))
+
 lines.append((starting_xy, starting_node_xy))
 colors.append((1,0,0))
 
 points.append(starting_xy)
 pt_colors.append((1,1,0))
 
+lines.append((end_xy, end_node_xy))
+colors.append((1,0,0))
+
+points.append(end_xy)
+pt_colors.append((1,1,0))
 
 draw_paths_mpl(lines, colors, points, pt_colors)
