@@ -75,15 +75,21 @@ def get_neighbors(node, ways):
 
     for i in nd_ways: 
         pos = i['data']['nd'].index(node_id)
+        len_nds = len(i['data']['nd'])
 
-        try:
-            neighbor_nodes.add(i['data']['nd'][pos + 1])
-        except IndexError:
-            pass
-        try:
-            neighbor_nodes.add(i['data']['nd'][pos - 1])
-        except IndexError:
-            pass
+
+        n_pos = pos + 1
+        c_pos = pos
+        p_pos = pos - 1
+
+        if pos + 1 >= len_nds:
+            n_pos = pos
+        if pos - 1 < 0:
+            p_pos = pos
+
+        neighbor_nodes.add(i['data']['nd'][n_pos])
+        neighbor_nodes.add(i['data']['nd'][c_pos])
+        neighbor_nodes.add(i['data']['nd'][p_pos])
 
     return list(neighbor_nodes)
 
@@ -152,16 +158,24 @@ def a_star_path(start_node, end_node, nodes, ways):
         queue.remove(current_node)
         queue = [x for x in queue if x not in finished]
         queue = sorted(queue, key = lambda x: x['comb_heur'])
-        print('hey', len(queue))
+        print('len of queue:', len(queue))
 
-    path.append(end_node)
+        queue_ids = [x['data']['id'] for x in queue]
+
+        print('queue:', queue_ids)
+        print()
+
+    path.append(queue[0])
     
     while path[-1] is not start_node:
         path.append(path[-1]['prev_node'])
         print('path i:', path[-1]['data']['id'])
-        time.sleep(1)
 
     path = list(reversed(path))
+
+    path_id = [x['data']['id'] for x in path]
+    print('path:', path_id)
+    print()
 
     return path
 
