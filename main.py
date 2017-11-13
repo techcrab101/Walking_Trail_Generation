@@ -72,64 +72,85 @@ def get_ways_with_nodes(ways, node_id, results, a):
 
 from multiprocessing import Manager, Process
 
-def get_neighbors(node, ways):
+def get_neighbors(node, way_edges):
     ''' Finds the degree of a node along with the node IDs that are adjacent (neighbors) '''
 
     start_time = datetime.now()
     node_id = node['data']['id']
 
-    # This should contain all the ways the node is on
-    start_time_2 = datetime.now()
+    print('node id:', node_id)
 
-    core_count = 4
-    manager = Manager()
-    results = manager.list(range(int(core_count)))
-    processes = []
-    iterator = len(ways) // core_count
-    j = 0
-    for i in range(core_count):
-        if i == core_count -1:
-            processes.append(Process(target=get_ways_with_nodes,
-                args=(ways[j:], node_id, results, i)))
-        else:
-            processes.append(Process(target=get_ways_with_nodes,
-                args=(ways[j: j + iterator], node_id, results, i)))
-        j += iterator
-        processes[i].start()
+    # TODO: lksdfka sdjf
+    print (len(way_edges))
+    edges = list(filter(lambda way_edges: node_id in way_edges, way_edges))
+    print(edges)
 
-    for i in processes:
-        i.join()
-    nd_ways = [val for sublist in results for val in sublist]
+    edges = [val for sublist in edges for val in sublist]
+    print (edges)
+    
+    edges = list(set(edges))
 
-    #nd_ways = list(filter(lambda ways: node_id in ways['data']['nd'], ways))
-    print('time for filtering node ids', datetime.now() - start_time_2)
+    edges.sort()
 
-    neighbor_nodes = set()
-    print('len of nd_ways', len(nd_ways))
-    for i in nd_ways: 
-        pos = i['data']['nd'].index(node_id)
-        len_nds = len(i['data']['nd'])
+    edges = list(edges for edges, _ in groupby(edges))
+    print(edges)
+    if len(edges) > 1:
+        edges.remove(node_id)
+
+    print(edges)
+
+    # # This should contain all the ways the node is on
+    # start_time_2 = datetime.now()
+
+    # core_count = 4
+    # manager = Manager()
+    # results = manager.list(range(int(core_count)))
+    # processes = []
+    # iterator = len(ways) // core_count
+    # j = 0
+    # for i in range(core_count):
+    #     if i == core_count -1:
+    #         processes.append(Process(target=get_ways_with_nodes,
+    #             args=(ways[j:], node_id, results, i)))
+    #     else:
+    #         processes.append(Process(target=get_ways_with_nodes,
+    #             args=(ways[j: j + iterator], node_id, results, i)))
+    #     j += iterator
+    #     processes[i].start()
+
+    # for i in processes:
+    #     i.join()
+    # nd_ways = [val for sublist in results for val in sublist]
+
+    # #nd_ways = list(filter(lambda ways: node_id in ways['data']['nd'], ways))
+    # print('time for filtering node ids', datetime.now() - start_time_2)
+
+    # neighbor_nodes = set()
+    # print('len of nd_ways', len(nd_ways))
+    # for i in nd_ways: 
+    #     pos = i['data']['nd'].index(node_id)
+    #     len_nds = len(i['data']['nd'])
 
 
-        n_pos = pos + 1
-        c_pos = pos
-        p_pos = pos - 1
+    #     n_pos = pos + 1
+    #     c_pos = pos
+    #     p_pos = pos - 1
 
-        if pos + 1 >= len_nds:
-            n_pos = pos
-        if pos - 1 < 0:
-            p_pos = pos
+    #     if pos + 1 >= len_nds:
+    #         n_pos = pos
+    #     if pos - 1 < 0:
+    #         p_pos = pos
 
-        neighbor_nodes.add(i['data']['nd'][n_pos])
-        neighbor_nodes.add(i['data']['nd'][c_pos])
-        neighbor_nodes.add(i['data']['nd'][p_pos])
+    #     neighbor_nodes.add(i['data']['nd'][n_pos])
+    #     neighbor_nodes.add(i['data']['nd'][c_pos])
+    #     neighbor_nodes.add(i['data']['nd'][p_pos])
 
-        neighbor_nodes.remove(i['data']['nd'][c_pos])
+    #     neighbor_nodes.remove(i['data']['nd'][c_pos])
     print('difference of time for get_neighbors:', datetime.now() - start_time)
 
-    return list(neighbor_nodes)
+    return list(edges)
 
-def a_star_path(start_node, end_node, nodes, ways):
+def a_star_path(start_node, end_node, nodes, way_edges):
     ''' Returns a list of node objs that make up a path between two points''' 
     path = []
 
@@ -159,7 +180,7 @@ def a_star_path(start_node, end_node, nodes, ways):
         current_node = queue[0]
         current_coord = convert_to_xy((current_node['data']['lat'], current_node['data']['lon']))
         
-        neighbor_ids = get_neighbors(current_node, ways)
+        neighbor_ids = get_neighbors(current_node, way_edges)
 
         neighbors = list(filter(lambda nodes: nodes['data']['id'] in neighbor_ids, nodes))
 
@@ -238,7 +259,7 @@ def a_star_path(start_node, end_node, nodes, ways):
 
     return path
 
-def get_leg(starting_node, nodes, ways):
+def get_leg(starting_node, nodes, way_edges):
     ''' This should return a list of node objects that make up the leg of a path '''
 
     # The path is made up of several legs
@@ -261,7 +282,7 @@ def get_leg(starting_node, nodes, ways):
         odds_found = False
         current_node = leg[-1]
         
-        neighbor_ids = get_neighbors(current_node, ways)
+        neighbor_ids = get_neighbors(current_node, way_edges)
         neighbors = list(filter(lambda nodes: nodes['data']['id'] in neighbor_ids, nodes))
 
         neighbors = sorted(neighbors, key=lambda x: x['data']['id']) 
@@ -285,7 +306,7 @@ def get_leg(starting_node, nodes, ways):
                 # print('second odd:', second_odd)
                 # print()
 
-                odd_path = a_star_path(second_odd, first_odd, nodes, ways)
+                odd_path = a_star_path(second_odd, first_odd, nodes, way_edges)
                 
                 first_odd['odd'] = False
                 second_odd['odd'] = False
@@ -344,7 +365,7 @@ def get_leg(starting_node, nodes, ways):
 
     if leg[0]['data']['id'] != leg[-1]['data']['id']:
         # print('creating return path')
-        return_path = a_star_path(leg[-1], leg[0], nodes, ways)
+        return_path = a_star_path(leg[-1], leg[0], nodes, way_edges)
 
         leg.extend(return_path)
 
@@ -356,72 +377,7 @@ def get_leg(starting_node, nodes, ways):
     return leg
 
 def remove_edges(ways, edges):
-    # TODO: Fix this function. It's slowing everything down by exponentially adding new ways
-    print ('#########################################################')
-    print()
-    print('Length of original ways:', len(ways))
-    print()
-    new_ways = []
-    
-    for i in edges:
-        print('on no')
-        
-        ways_with_edges = list(filter(lambda ways: i[0] in ways['data']['nd'] and 
-            i[1] in ways['data']['nd'] and
-            ways['data']['nd'].index(i[0]) == ways['data']['nd'].index(i[1]) + 1
-            , ways))
-
-        print('len of ways with edges:', len(ways_with_edges))
-
-        start_time = datetime.now()
-        for j in ways_with_edges:
-            index_0 = j['data']['nd'].index(i[0])
-            index_1 = j['data']['nd'].index(i[1])
-            
-            if index_0 == 0:
-                new_way = j
-                new_way['data']['nd'] = j['data']['nd'][2:]
-                new_ways.append(new_way)
-                print('adding to the stream')
-            elif index_1 == len(j['data']['nd']) - 1:
-                new_way = j
-                new_way['data']['nd'] = j['data']['nd'][:-2]
-                new_ways.append(j)
-                print('adding to the stream')
-            else:
-                new_way_1 = deepcopy(j)
-                new_way_1['data']['id'] += datetime.now().microsecond
-                new_way_1['data']['nd'] = j['data']['nd'][:index_0]
-                new_way_2 = deepcopy(j)
-                new_way_2['data']['id'] += datetime.now().microsecond + 1
-                new_way_2['data']['nd'] = j['data']['nd'][index_1+1:]
-                
-                new_ways.append(new_way_1)
-                new_ways.append(new_way_2)
-                print('adding 2 to the stream')
-
-        print('difference in time:', datetime.now() - start_time)
-        ways_without_edges = list(filter(lambda ways: not(i[0] in ways['data']['nd'] and 
-            i[1] in ways['data']['nd'] and
-            ways['data']['nd'].index(i[0]) == ways['data']['nd'].index(i[1]) + 1),
-            ways))
-        
-        print('ways without edges length:', len(ways_without_edges))
-        # TODO: Adding a ton of repeats with this loop
-
-        new_way_ids = [x['data']['id'] for x in new_ways]
-        print(new_way_ids)
-        for i in ways_without_edges:
-            if i['data']['id'] not in new_way_ids:
-                new_ways.append(i)
-                print('adding to the stream')
-
-    print('Length of new ways:', len(new_ways))
-    print()
-    print ('#########################################################')
-    print()
-
-    return new_ways
+    return [item for item in ways if item not in edges]
 
 def get_edges(path):
     '''Takes in a list of node objects and gets the edges between them'''
@@ -455,12 +411,12 @@ def get_path_dist(path):
 
     return total
 
-def get_path(starting_node, nodes, ways, dist_target=0, time_target=0):
+def get_path(starting_node, nodes, way_edges, dist_target=0, time_target=0):
     ''' This should returnn a list of node objects that make up the path '''
 
     path = []
 
-    starting_leg = get_leg(starting_node, nodes, ways)
+    starting_leg = get_leg(starting_node, nodes, way_edges)
 
     path.extend(starting_leg)
 
@@ -478,9 +434,9 @@ def get_path(starting_node, nodes, ways, dist_target=0, time_target=0):
         current_node = path[i]
         current_pos = i
         edges = get_edges(path)
-        ways = remove_edges(ways, edges)
+        way_edges = remove_edges(way_edges, edges)
 
-        new_leg = get_leg(current_node, nodes, ways)
+        new_leg = get_leg(current_node, nodes, way_edges)
 
         path[current_pos:current_pos] = new_leg
         
@@ -519,6 +475,22 @@ def get_path(starting_node, nodes, ways, dist_target=0, time_target=0):
 
     return path
 
+def get_edges_from_ways(ways):
+    edges = []
+
+    for i in ways:
+        nodes = i['data']['nd']
+        for j in range(len(nodes)):
+            try:
+                edges.append([nodes[j], nodes[j+1]])
+            except IndexError:
+                pass
+    print(len(edges))
+    #edges.sort()
+    #edges = list(edges for edges, _ in groupby(edges))
+    print(edges)
+    return edges
+
 raw_data = api.Map(min_lon, min_lat, max_lon, max_lat)
 
 nodes = list(filter(lambda raw_data: raw_data['type'] == 'node', raw_data))
@@ -532,8 +504,9 @@ for i in ways:
 
 nodes_on_way = list(nodes_on_way)
 
-nodes = list(filter (lambda nodes: nodes['data']['id'] in nodes_on_way, nodes))
+way_edges = get_edges_from_ways(ways)
 
+nodes = list(filter (lambda nodes: nodes['data']['id'] in nodes_on_way, nodes))
 
 relations = list(filter(lambda raw_data: raw_data['type'] == 'relation', raw_data))
 
@@ -572,7 +545,7 @@ print('ending node:', end_node)
 print()
 
 
-leg = get_path(starting_node, nodes, ways)
+leg = get_path(starting_node, nodes, way_edges)#ways)
 
 lines = []
 colors = []
