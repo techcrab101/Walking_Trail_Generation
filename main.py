@@ -11,8 +11,8 @@ api = osmapi.OsmApi()
 
 lat, lon = 34.051491, -84.071297
 
-starting_coord = (-84.0736408, 34.0522912)#(lon - 0.001, lat + 0.001)
-end_coord = (-84.0843963, 34.0447567)#(lon + 0.001 , lat  - 0.001)
+starting_coord = (lon - 0.001, lat + 0.001) #(-84.0736408, 34.0522912)#
+end_coord = (lon + 0.001 , lat  - 0.001) #(-84.0843963, 34.0447567)#
 
 notable_coords = []
 dist = 10 # km
@@ -91,6 +91,8 @@ def get_neighbors(node, ways):
         neighbor_nodes.add(i['data']['nd'][c_pos])
         neighbor_nodes.add(i['data']['nd'][p_pos])
 
+        neighbor_nodes.remove(i['data']['nd'][c_pos])
+
     return list(neighbor_nodes)
 
 def a_star_path(start_node, end_node, nodes, ways):
@@ -100,6 +102,13 @@ def a_star_path(start_node, end_node, nodes, ways):
     if start_node == end_node:
         return [start_node]
 
+    # This is needed to get rid of all the data collected from the previous times function was run
+    for i in nodes:
+        try:
+            i.pop('prev_node', None)
+        except KeyError:
+            pass
+
     queue = []
     start_node['dist'] = 0
     queue.append(start_node)
@@ -108,7 +117,10 @@ def a_star_path(start_node, end_node, nodes, ways):
 
     finished = []
 
-    while queue[0] is not end_node:
+    while queue[0]['data']['id'] is not end_node['data']['id']:
+        print('start node:', start_node['data']['id'])
+        print('end_node:', end_node['data']['id'])
+        print()
         current_node = queue[0]
         current_coord = convert_to_xy((current_node['data']['lat'], current_node['data']['lon']))
         
@@ -116,6 +128,17 @@ def a_star_path(start_node, end_node, nodes, ways):
 
         neighbors = list(filter(lambda nodes: nodes['data']['id'] in neighbor_ids, nodes))
 
+        print('BEFORE REMOVAL')
+        for i in neighbors:
+            print(i['data']['id'])
+        
+        neighbors = [x for x in neighbors if x['data']['id'] not in finished]
+        
+        print('AFTER REMOVAL')
+        for i in neighbors:
+            print(i['data']['id'])
+
+        print()
         print('current node id:', current_node['data']['id'])
         print('neighbor ids:', neighbor_ids)
         print()
@@ -131,7 +154,6 @@ def a_star_path(start_node, end_node, nodes, ways):
             except KeyError:
                 i['prev_node'] = current_node
 
-
             try:
                 if new_dist < i['dist']:
                     i['dist'] = new_dist
@@ -139,7 +161,6 @@ def a_star_path(start_node, end_node, nodes, ways):
             except KeyError:
                 i['dist'] = new_dist
                 i['prev_node'] = current_node
-            
             
             try:
                 i['end_dist']
@@ -153,10 +174,10 @@ def a_star_path(start_node, end_node, nodes, ways):
 
         queue.extend(neighbors)
 
-        finished.append(current_node)
+        finished.append(current_node['data']['id'])
 
         queue.remove(current_node)
-        queue = [x for x in queue if x not in finished]
+        queue = [x for x in queue if x['data']['id'] not in finished]
         queue = sorted(queue, key = lambda x: x['comb_heur'])
         print('len of queue:', len(queue))
 
@@ -225,7 +246,7 @@ def get_leg(starting_node, nodes, ways):
                 print('second odd:', second_odd)
                 print()
 
-                odd_path = a_star_path(first_odd, second_odd, nodes, ways)
+                odd_path = a_star_path(second_odd, first_odd, nodes, ways)
                 
                 first_odd['odd'] = False
                 second_odd['odd'] = False
@@ -234,16 +255,12 @@ def get_leg(starting_node, nodes, ways):
                 second_odd = None
 
                 print('len of odd path:', len(odd_path))
-                print('odd path:', odd_path)
-
 
                 for i in range(len(odd_path)):
                     try:
                         odd_path[i]['prev_leg_neighbor'].add(odd_path[i-1]['data']['id'])
                     except KeyError:
                         odd_path[i]['prev_leg_neighbor'] = set()
-                    except IndexError:
-                        pass
 
                 odds_found = True
 
@@ -279,8 +296,18 @@ def get_leg(starting_node, nodes, ways):
             leg_finished = True
             break
 
+        leg_ids = [x['data']['id'] for x in leg]
+
+        print()
+        print('Leg ids:', leg_ids)
+        print()
         just_started = False
-        time.sleep(0.5)
+
+    if leg[0]['data']['id'] != leg[-1]['data']['id']:
+        print('creating return path')
+        return_path = a_star_path(leg[-1], leg[0], nodes, ways)
+
+        leg.extend(return_path)
     return leg
 
 def get_path(starting_node, nodes, ways):
@@ -349,7 +376,7 @@ print('ending node:', end_node)
 print()
 
 
-leg = a_star_path(starting_node, end_node, nodes, ways) #get_leg(starting_node, nodes, ways)
+leg = get_leg(starting_node, nodes, ways)
 
 lines = []
 colors = []
@@ -361,7 +388,7 @@ print ('THE LEG')
 q = 0
 w = 1/len(leg)
 for i in leg:
-    print(i)
+    print(i['data']['id'])
     print()
     coord = convert_to_xy((i['data']['lon'],i['data']['lat']))
     q += w
