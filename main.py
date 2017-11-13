@@ -11,16 +11,26 @@ from datetime import datetime
 import pylab as pl
 from matplotlib import collections as mc
 
+# TODO: Take input from the terminal
+# TODO: Add all the proper terminal documentation (--help)
+# TODO: Change code so it uses terminal
+# TODO: Figure out how to output the data
+# TODO: print series of lon, lats?
+# TODO: Figure out Graphical user interface
+# TODO: Have text or something
+
 api = osmapi.OsmApi()
 
 lat, lon = 34.051491, -84.071297
+lat, lon = 34.047401, -84.084576
 
-starting_coord = (lon - 0.001, lat + 0.001) #(-84.0736408, 34.0522912)#
+starting_coord = (lon, lat)#(lon - 0.001, lat + 0.001) #(-84.0736408, 34.0522912)#
 end_coord = (lon + 0.001 , lat  - 0.001) #(-84.0843963, 34.0447567)#
 
 notable_coords = []
-dist = 10 # km
-time_ = 60 # minutes
+target_dist = 0#10 # km
+target_time = 60#60 # minutes
+walking_pace = 5
 
 box_width = 0.005
 box_height = 0.005
@@ -30,6 +40,32 @@ min_lat = lat - (box_height/2)
 
 max_lon = lon + (box_width/2)
 max_lat = lat + (box_height/2)
+
+def get_map_lines(ways):
+    lines = []
+    colors = []
+    for i in ways:
+        node_list = i['data']['nd']
+        
+        c = (random() * 0.25, random(), random())
+        
+        for j in range(len(node_list)):
+            try:
+                node_list[j+1]
+            except:
+                break
+            prev_node = list(filter(lambda nodes: nodes['data']['id'] == node_list[j], nodes))[0]
+            next_node = list(filter(lambda nodes: nodes['data']['id'] == node_list[j+1], nodes))[0]
+    
+            prev_coord = (prev_node['data']['lon'], prev_node['data']['lat'])
+            next_coord = (next_node['data']['lon'], next_node['data']['lat'])
+    
+            prev_coord = convert_to_xy(prev_coord)
+            next_coord = convert_to_xy(next_coord)
+    
+            lines.append((prev_coord, next_coord))
+            colors.append(c)
+    return lines, colors
 
 def draw_paths_mpl(lines, line_colors, points=[], point_colors=[]):
     fig, ax = pl.subplots()
@@ -67,35 +103,33 @@ def get_nearest_node(starting_coord, nodes):
     '''Returns the nearest node object based on longitue latitude coords '''
     return min(nodes, key=lambda x: get_dist((starting_coord), (x['data']['lon'], x['data']['lat'])))
 
-
 def get_neighbors(node, way_edges):
     ''' Finds the degree of a node along with the node IDs that are adjacent (neighbors) '''
 
     start_time = datetime.now()
     node_id = node['data']['id']
 
-    print('node id:', node_id)
+    # print('node id:', node_id)
 
-    # TODO: lksdfka sdjf
-    print (len(way_edges))
+    # print (len(way_edges))
     edges = list(filter(lambda way_edges: node_id in way_edges, way_edges))
-    print(edges)
+    # print(edges)
 
     edges = [val for sublist in edges for val in sublist]
-    print (edges)
+    # print (edges)
     
     edges = list(set(edges))
 
     edges.sort()
 
     edges = list(edges for edges, _ in groupby(edges))
-    print(edges)
+    # print(edges)
     if len(edges) > 1:
         edges.remove(node_id)
 
-    print(edges)
+    # print(edges)
 
-    print('difference of time for get_neighbors:', datetime.now() - start_time)
+    # print('difference of time for get_neighbors:', datetime.now() - start_time)
 
     return list(edges)
 
@@ -122,10 +156,6 @@ def a_star_path(start_node, end_node, nodes, way_edges):
     finished = []
 
     while queue[0]['data']['id'] is not end_node['data']['id']:
-        print ('looping in queue of a star')
-        # print('start node:', start_node['data']['id'])
-        # print('end_node:', end_node['data']['id'])
-        # print()
         current_node = queue[0]
         current_coord = convert_to_xy((current_node['data']['lat'], current_node['data']['lon']))
         
@@ -133,22 +163,10 @@ def a_star_path(start_node, end_node, nodes, way_edges):
 
         neighbors = list(filter(lambda nodes: nodes['data']['id'] in neighbor_ids, nodes))
 
-        # print('BEFORE REMOVAL')
-        # for i in neighbors:
-        #     print(i['data']['id'])
         
         neighbors = [x for x in neighbors if x['data']['id'] not in finished]
         
-        # print('AFTER REMOVAL')
-        # for i in neighbors:
-        #     print(i['data']['id'])
 
-        # print()
-        # print('current node id:', current_node['data']['id'])
-        # print('neighbor ids:', neighbor_ids)
-        # print()
-
-        start_time = datetime.now()
         for i in neighbors:
             coord = convert_to_xy((i['data']['lon'], i['data']['lat']))
            
@@ -177,7 +195,6 @@ def a_star_path(start_node, end_node, nodes, way_edges):
 
         neighbors = sorted(neighbors, key=lambda x: x['comb_heur']) 
 
-        print('diff of time for working with neighbors:', datetime.now() - start_time)
         queue.extend(neighbors)
 
         finished.append(current_node['data']['id'])
@@ -186,25 +203,15 @@ def a_star_path(start_node, end_node, nodes, way_edges):
         queue.remove(current_node)
         queue = [x for x in queue if x['data']['id'] not in finished]
         queue = sorted(queue, key = lambda x: x['comb_heur'])
-        # print('len of queue:', len(queue))
         queue_ids = [x['data']['id'] for x in queue]
 
-        print('diff of time for working in queue:', datetime.now() - start_time)
-        # print('queue:', queue_ids)
-        # print()
 
     path.append(queue[0])
     
     while path[-1] is not start_node:
-        print ('looping in path of a_star')
         path.append(path[-1]['prev_node'])
-        # print('path i:', path[-1]['data']['id'])
 
     path = list(reversed(path))
-
-    path_id = [x['data']['id'] for x in path]
-    # print('path:', path_id)
-    # print()
 
     return path
 
@@ -216,6 +223,7 @@ def get_leg(starting_node, nodes, way_edges):
 
     # starting_node = get_nearest_node(starting_coord, nodes)
     starting_node ['prev_leg_neighbor'] = set()
+    starting_node ['next_leg_neighbor'] = set()
     leg.append(starting_node)
 
     leg_finished = False
@@ -225,19 +233,24 @@ def get_leg(starting_node, nodes, way_edges):
     odds_found = False
     first_odd = None
     second_odd = None
+
+    for i in nodes:
+        i['data']['prev_leg_neighbor'] = set() 
+        i['data']['next_leg_neighbor'] = set() 
+
     while not(leg_finished):
-        print ('looping in get_leg')
         
         odds_found = False
         current_node = leg[-1]
-        
+
         neighbor_ids = get_neighbors(current_node, way_edges)
         neighbors = list(filter(lambda nodes: nodes['data']['id'] in neighbor_ids, nodes))
 
         neighbors = sorted(neighbors, key=lambda x: x['data']['id']) 
         degree = len(neighbors)
-        
-        # print('degree', degree)
+
+        if len(current_node['prev_leg_neighbor']) >= degree:
+            break
 
         if degree % 2 != 0:
             try:
@@ -250,11 +263,6 @@ def get_leg(starting_node, nodes, way_edges):
             elif current_node['odd'] == True:
                 second_odd = current_node
 
-                # print('first odd:', first_odd)
-                # print()
-                # print('second odd:', second_odd)
-                # print()
-
                 odd_path = a_star_path(second_odd, first_odd, nodes, way_edges)
                 
                 first_odd['odd'] = False
@@ -263,21 +271,31 @@ def get_leg(starting_node, nodes, way_edges):
                 first_odd = None
                 second_odd = None
 
-                # print('len of odd path:', len(odd_path))
-
                 for i in range(len(odd_path)):
                     try:
                         odd_path[i]['prev_leg_neighbor'].add(odd_path[i-1]['data']['id'])
                     except KeyError:
                         odd_path[i]['prev_leg_neighbor'] = set()
+                    except IndexError:
+                        pass
+
+                    try:
+                        odd_path[i]['next_leg_neighbor'].add(odd_path[i+1]['data']['id'])
+                    except KeyError:
+                        odd_path[i]['next_leg_neighbor'] = set()
+                    except IndexError:
+                        pass
 
                 odds_found = True
 
         if not(odds_found):
             neighbors = [x for x in neighbors if x['data']['id'] not in list(current_node['prev_leg_neighbor'])]
-    
+            try:
+                neighbors = [x for x in neighbors if x['data']['id'] not in list(current_node['next_leg_neighbor'])]
+            except KeyError:
+                pass
+
             if len(neighbors) == 0:
-                # print('no more neighbors')
                 leg_finished = True
                 break
     
@@ -288,32 +306,27 @@ def get_leg(starting_node, nodes, way_edges):
                 neighbors[0]['prev_leg_neighbor'].add(current_node['data']['id'])
     
             next_node = neighbors[0] 
-    
-            # print('prev node:', current_node['prev_leg_neighbor'])
-            # print('current node:', current_node['data']['id'])
-            # print('next node:', next_node['data']['id'])
+
+            try:
+                current_node['next_leg_neighbor'].add(next_node['data']['id'])
+            except KeyError:
+                current_node['next_leg_neighbor'] = set()
+                current_node['next_leg_neighbor'].add(next_node['data']['id'])
+            
             leg.append(next_node)
-    
-            # print('len of leg', len(leg))
-            # print()
     
         else:
             leg.extend(odd_path)
 
         if current_node['data']['id'] is starting_node['data']['id'] and not(just_started):
-            # print('current is starting')
             leg_finished = True
             break
 
         leg_ids = [x['data']['id'] for x in leg]
 
-        # print()
-        # print('Leg ids:', leg_ids)
-        # print()
         just_started = False
 
     if leg[0]['data']['id'] != leg[-1]['data']['id']:
-        # print('creating return path')
         return_path = a_star_path(leg[-1], leg[0], nodes, way_edges)
 
         leg.extend(return_path)
@@ -359,24 +372,25 @@ def get_path_dist(path):
 
     return total
 
-def get_path(starting_node, nodes, way_edges, dist_target=0, time_target=0):
+def get_path(starting_node, nodes, way_edges, dist_target=0, time_target=0, walking_pace=5):
     ''' This should returnn a list of node objects that make up the path '''
 
     path = []
 
     starting_leg = get_leg(starting_node, nodes, way_edges)
-
     path.extend(starting_leg)
 
     if dist_target == 0 and time_target != 0:
-        walking_pace = 5 # kmph
-
         dist_target = walking_pace * (time_target / 60)
+    elif dist_target != 0 and time_target != 0:
+        dist_target2 = walking_pace * (time_target / 60)
+        dist_target = dist_target if dist_target < dist_target2 else dist_target2
 
     conditions_met = False
     i = 0
     change_made = False
 
+    dist = 0
     while not(conditions_met):
 
         current_node = path[i]
@@ -396,36 +410,24 @@ def get_path(starting_node, nodes, way_edges, dist_target=0, time_target=0):
 
         dist = get_path_dist(path)
 
-        print('current index:', i)
-        print('len of legs:', len(new_leg))
-        print('len of path:', len(path))
-
-
         if len(new_leg) != 0:
             change_made = True
 
         if dist >= dist_target and dist_target != 0:
-            print('Dist was > than the dist_target')
             conditions_met = True
-
-        # TODO: Get all the edges from the path already.
-        # TODO: Remove edges from ways. (You need to split up the way into two as needed
 
         i+=1
 
         if change_made:
-            i = 0
+            #i = 0
             change_made = False
-            print('Change has been made')
+            print('len of path:', len(path))
 
         if i >= len(path):
-            print('Went through entire path and found no more connections to make')
             conditions_met = True
 
-    if path[0]['data']['id'] != path[-1]['data']['id']:
-        print('HEY LOOK AT ME')
-
-    return path
+    time = (dist/walking_pace) * 60
+    return path, dist, time
 
 def get_edges_from_ways(ways):
     edges = []
@@ -437,10 +439,6 @@ def get_edges_from_ways(ways):
                 edges.append([nodes[j], nodes[j+1]])
             except IndexError:
                 pass
-    print(len(edges))
-    #edges.sort()
-    #edges = list(edges for edges, _ in groupby(edges))
-    print(edges)
     return edges
 
 raw_data = api.Map(min_lon, min_lat, max_lon, max_lat)
@@ -462,55 +460,23 @@ nodes = list(filter (lambda nodes: nodes['data']['id'] in nodes_on_way, nodes))
 
 relations = list(filter(lambda raw_data: raw_data['type'] == 'relation', raw_data))
 
-print('total data amount:', len(raw_data))
-print('Number of nodes:', len(nodes))
-print('Number of ways:', len(ways))
-print('Number of relations:', len(relations))
-
-walkable_tags = [
-        'secondary',
-        'tertiary',
-        'unclassified',
-        'residential',
-        'secondary_link',
-        'tertiary_link',
-        'living_street',
-        'pedestrian',
-        'track',
-        'road',
-        'footway',
-        'bridleway',
-        'steps',
-        'path'
-        ]
-
-walkable_ways = list(filter(lambda ways: ways['data']['tag']['highway'] in walkable_tags, ways))
-
-print('Number of walkable ways:', len(walkable_ways))
-
 starting_node = get_nearest_node(starting_coord, nodes)
 end_node = get_nearest_node(end_coord, nodes)
 
 print('starting node:', starting_node)
 print()
-print('ending node:', end_node)
-print()
 
-
-leg = get_path(starting_node, nodes, way_edges)#ways)
+path, path_dist, path_time = get_path(starting_node, nodes, way_edges, target_dist, target_time, walking_pace)
 
 lines = []
 colors = []
 points = []
 pt_colors = []
 
-print ('THE LEG')
-
 q = 0
-w = 1/len(leg)
-for i in leg:
-    print(i['data']['id'])
-    print()
+w = 1/len(path)
+for i in path:
+    print('node id:', i['data']['id'])
     coord = convert_to_xy((i['data']['lon'],i['data']['lat']))
     q += w
     if q > 1:
@@ -518,27 +484,15 @@ for i in leg:
     points.append(coord)
     pt_colors.append((0,0,q, q))
 
-for i in ways:
-    node_list = i['data']['nd']
-    
-    c = (random() * 0.25, random(), random())
-    
-    for j in range(len(node_list)):
-        try:
-            node_list[j+1]
-        except:
-            break
-        prev_node = list(filter(lambda nodes: nodes['data']['id'] == node_list[j], nodes))[0]
-        next_node = list(filter(lambda nodes: nodes['data']['id'] == node_list[j+1], nodes))[0]
+print()
 
-        prev_coord = (prev_node['data']['lon'], prev_node['data']['lat'])
-        next_coord = (next_node['data']['lon'], next_node['data']['lat'])
+print('Dist:', path_dist, 'km')
+print('Time:', path_time, 'mins')
 
-        prev_coord = convert_to_xy(prev_coord)
-        next_coord = convert_to_xy(next_coord)
+map_lines, map_colors = get_map_lines(ways)
 
-        lines.append((prev_coord, next_coord))
-        colors.append(c)
+lines.extend(map_lines)
+colors.extend(map_colors)
 
 for i in range(len(points)):
     try:
