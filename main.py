@@ -2,6 +2,8 @@ import osmapi
 
 import math
 import time
+from itertools import groupby
+from operator import itemgetter
 from random import random
 
 import pylab as pl
@@ -308,6 +310,9 @@ def get_leg(starting_node, nodes, ways):
         return_path = a_star_path(leg[-1], leg[0], nodes, ways)
 
         leg.extend(return_path)
+
+    leg = list(map(itemgetter(0), groupby(leg)))
+
     return leg
 
 def get_path(starting_node, nodes, ways):
