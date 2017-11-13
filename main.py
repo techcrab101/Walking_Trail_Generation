@@ -5,6 +5,7 @@ import time
 from itertools import groupby
 from operator import itemgetter
 from random import random
+from copy import deepcopy
 
 import pylab as pl
 from matplotlib import collections as mc
@@ -120,9 +121,9 @@ def a_star_path(start_node, end_node, nodes, ways):
     finished = []
 
     while queue[0]['data']['id'] is not end_node['data']['id']:
-        print('start node:', start_node['data']['id'])
-        print('end_node:', end_node['data']['id'])
-        print()
+        # print('start node:', start_node['data']['id'])
+        # print('end_node:', end_node['data']['id'])
+        # print()
         current_node = queue[0]
         current_coord = convert_to_xy((current_node['data']['lat'], current_node['data']['lon']))
         
@@ -130,20 +131,20 @@ def a_star_path(start_node, end_node, nodes, ways):
 
         neighbors = list(filter(lambda nodes: nodes['data']['id'] in neighbor_ids, nodes))
 
-        print('BEFORE REMOVAL')
-        for i in neighbors:
-            print(i['data']['id'])
+        # print('BEFORE REMOVAL')
+        # for i in neighbors:
+        #     print(i['data']['id'])
         
         neighbors = [x for x in neighbors if x['data']['id'] not in finished]
         
-        print('AFTER REMOVAL')
-        for i in neighbors:
-            print(i['data']['id'])
+        # print('AFTER REMOVAL')
+        # for i in neighbors:
+        #     print(i['data']['id'])
 
-        print()
-        print('current node id:', current_node['data']['id'])
-        print('neighbor ids:', neighbor_ids)
-        print()
+        # print()
+        # print('current node id:', current_node['data']['id'])
+        # print('neighbor ids:', neighbor_ids)
+        # print()
 
         for i in neighbors:
             coord = convert_to_xy((i['data']['lon'], i['data']['lat']))
@@ -181,24 +182,24 @@ def a_star_path(start_node, end_node, nodes, ways):
         queue.remove(current_node)
         queue = [x for x in queue if x['data']['id'] not in finished]
         queue = sorted(queue, key = lambda x: x['comb_heur'])
-        print('len of queue:', len(queue))
+        # print('len of queue:', len(queue))
 
         queue_ids = [x['data']['id'] for x in queue]
 
-        print('queue:', queue_ids)
-        print()
+        # print('queue:', queue_ids)
+        # print()
 
     path.append(queue[0])
     
     while path[-1] is not start_node:
         path.append(path[-1]['prev_node'])
-        print('path i:', path[-1]['data']['id'])
+        # print('path i:', path[-1]['data']['id'])
 
     path = list(reversed(path))
 
     path_id = [x['data']['id'] for x in path]
-    print('path:', path_id)
-    print()
+    # print('path:', path_id)
+    # print()
 
     return path
 
@@ -230,7 +231,7 @@ def get_leg(starting_node, nodes, ways):
         neighbors = sorted(neighbors, key=lambda x: x['data']['id']) 
         degree = len(neighbors)
         
-        print('degree', degree)
+        # print('degree', degree)
 
         if degree % 2 != 0:
             try:
@@ -243,10 +244,10 @@ def get_leg(starting_node, nodes, ways):
             elif current_node['odd'] == True:
                 second_odd = current_node
 
-                print('first odd:', first_odd)
-                print()
-                print('second odd:', second_odd)
-                print()
+                # print('first odd:', first_odd)
+                # print()
+                # print('second odd:', second_odd)
+                # print()
 
                 odd_path = a_star_path(second_odd, first_odd, nodes, ways)
                 
@@ -256,7 +257,7 @@ def get_leg(starting_node, nodes, ways):
                 first_odd = None
                 second_odd = None
 
-                print('len of odd path:', len(odd_path))
+                # print('len of odd path:', len(odd_path))
 
                 for i in range(len(odd_path)):
                     try:
@@ -270,7 +271,7 @@ def get_leg(starting_node, nodes, ways):
             neighbors = [x for x in neighbors if x['data']['id'] not in list(current_node['prev_leg_neighbor'])]
     
             if len(neighbors) == 0:
-                print('no more neighbors')
+                # print('no more neighbors')
                 leg_finished = True
                 break
     
@@ -282,49 +283,163 @@ def get_leg(starting_node, nodes, ways):
     
             next_node = neighbors[0] 
     
-            print('prev node:', current_node['prev_leg_neighbor'])
-            print('current node:', current_node['data']['id'])
-            print('next node:', next_node['data']['id'])
+            # print('prev node:', current_node['prev_leg_neighbor'])
+            # print('current node:', current_node['data']['id'])
+            # print('next node:', next_node['data']['id'])
             leg.append(next_node)
     
-            print('len of leg', len(leg))
-            print()
+            # print('len of leg', len(leg))
+            # print()
     
         else:
             leg.extend(odd_path)
 
         if current_node['data']['id'] is starting_node['data']['id'] and not(just_started):
-            print('current is starting')
+            # print('current is starting')
             leg_finished = True
             break
 
         leg_ids = [x['data']['id'] for x in leg]
 
-        print()
-        print('Leg ids:', leg_ids)
-        print()
+        # print()
+        # print('Leg ids:', leg_ids)
+        # print()
         just_started = False
 
     if leg[0]['data']['id'] != leg[-1]['data']['id']:
-        print('creating return path')
+        # print('creating return path')
         return_path = a_star_path(leg[-1], leg[0], nodes, ways)
 
         leg.extend(return_path)
 
     leg = list(map(itemgetter(0), groupby(leg)))
 
+    if len(leg) == 1:
+        return []
+
     return leg
 
-def get_path(starting_node, nodes, ways):
+def remove_edges(ways, edges):
+    new_ways = []
+    
+    for i in edges:
+        ways_with_edges = list(filter(lambda ways: i[0] in ways['data']['nd'] and 
+            i[1] in ways['data']['nd'] and
+            ways['data']['nd'].index(i[0]) == ways['data']['nd'].index(i[1]) + 1
+            , ways))
+        for j in ways_with_edges:
+            index_0 = j['data']['nd'].index(i[0])
+            index_1 = j['data']['nd'].index(i[1])
+            
+            if index_0 == 0:
+                j['data']['nd'] = j['data']['nd'][2:]
+                new_ways.append(j)
+            elif index_1 == len(j['data']['nd']) - 1:
+                j['data']['nd'] = j['data']['nd'][:-2]
+                new_ways.append(j)
+            else:
+                new_way_1 = deepcopy(j)
+                new_way_1['data']['nd'] = j['data']['nd'][:index_0]
+                new_way_2 = deepcopy(j)
+                new_way_2['data']['nd'] = j['data']['nd'][index_1+1:]
+                
+                new_ways.append(new_way_1)
+                new_ways.append(new_way_2)
+
+    return new_ways
+
+def get_edges(path):
+    '''Takes in a list of node objects and gets the edges between them'''
+    edges = []
+
+    for i in range(len(path)):
+        try:
+            coord = []
+            coord.append(path[i]['data']['id'])
+            coord.append(path[i+1]['data']['id'])
+
+            edges.append(coord)
+
+        except IndexError:
+            pass
+
+    return edges
+
+def get_path_dist(path):
+    total = 0
+
+    for i in range(len(path)):
+        try:
+            coord1 = convert_to_xy((path[i]['data']['lon'], path[i]['data']['lat']))
+            coord2 = convert_to_xy((path[i+1]['data']['lon'], path[i+1]['data']['lat']))
+
+            total += get_dist(coord1, coord2)
+        except IndexError:
+            pass
+
+    return total
+
+def get_path(starting_node, nodes, ways, dist_target=0, time_target=0):
     ''' This should returnn a list of node objects that make up the path '''
 
     path = []
 
     starting_leg = get_leg(starting_node, nodes, ways)
 
-    while True:
-       pass 
+    path.extend(starting_leg)
 
+    if dist_target == 0 and time_target != 0:
+        walking_pace = 5 # kmph
+
+        dist_target = walking_pace * (time_target / 60)
+
+    conditions_met = False
+    i = 0
+    change_made = False
+
+    while not(conditions_met):
+
+        current_node = path[i]
+        current_pos = i
+        edges = get_edges(path)
+        ways = remove_edges(ways, edges)
+
+        new_leg = get_leg(current_node, nodes, ways)
+
+        path[current_pos:current_pos] = new_leg
+        
+        path = list(map(itemgetter(0), groupby(path)))
+
+        dist = get_path_dist(path)
+
+        print('current index:', i)
+        print('len of legs:', len(new_leg))
+        print('len of path:', len(path))
+
+
+        if len(new_leg) != 0:
+            change_made = True
+
+        if dist >= dist_target and dist_target != 0:
+            print('Dist was > than the dist_target')
+            conditions_met = True
+
+        # TODO: Get all the edges from the path already.
+        # TODO: Remove edges from ways. (You need to split up the way into two as needed
+
+        i+=1
+
+        if change_made:
+            i = 0
+            change_made = False
+            print('Change has been made')
+
+        if i >= len(path):
+            print('Went through entire path and found no more connections to make')
+            conditions_met = True
+
+    if path[0]['data']['id'] != path[-1]['data']['id']:
+        print('HEY LOOK AT ME')
 
     return path
 
@@ -381,7 +496,7 @@ print('ending node:', end_node)
 print()
 
 
-leg = get_leg(starting_node, nodes, ways)
+leg = get_path(starting_node, nodes, ways)
 
 lines = []
 colors = []
