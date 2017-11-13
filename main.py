@@ -67,10 +67,6 @@ def get_nearest_node(starting_coord, nodes):
     '''Returns the nearest node object based on longitue latitude coords '''
     return min(nodes, key=lambda x: get_dist((starting_coord), (x['data']['lon'], x['data']['lat'])))
 
-def get_ways_with_nodes(ways, node_id, results, a):
-    results[a] = list(filter(lambda ways: node_id in ways['data']['nd'], ways))
-
-from multiprocessing import Manager, Process
 
 def get_neighbors(node, way_edges):
     ''' Finds the degree of a node along with the node IDs that are adjacent (neighbors) '''
@@ -99,53 +95,6 @@ def get_neighbors(node, way_edges):
 
     print(edges)
 
-    # # This should contain all the ways the node is on
-    # start_time_2 = datetime.now()
-
-    # core_count = 4
-    # manager = Manager()
-    # results = manager.list(range(int(core_count)))
-    # processes = []
-    # iterator = len(ways) // core_count
-    # j = 0
-    # for i in range(core_count):
-    #     if i == core_count -1:
-    #         processes.append(Process(target=get_ways_with_nodes,
-    #             args=(ways[j:], node_id, results, i)))
-    #     else:
-    #         processes.append(Process(target=get_ways_with_nodes,
-    #             args=(ways[j: j + iterator], node_id, results, i)))
-    #     j += iterator
-    #     processes[i].start()
-
-    # for i in processes:
-    #     i.join()
-    # nd_ways = [val for sublist in results for val in sublist]
-
-    # #nd_ways = list(filter(lambda ways: node_id in ways['data']['nd'], ways))
-    # print('time for filtering node ids', datetime.now() - start_time_2)
-
-    # neighbor_nodes = set()
-    # print('len of nd_ways', len(nd_ways))
-    # for i in nd_ways: 
-    #     pos = i['data']['nd'].index(node_id)
-    #     len_nds = len(i['data']['nd'])
-
-
-    #     n_pos = pos + 1
-    #     c_pos = pos
-    #     p_pos = pos - 1
-
-    #     if pos + 1 >= len_nds:
-    #         n_pos = pos
-    #     if pos - 1 < 0:
-    #         p_pos = pos
-
-    #     neighbor_nodes.add(i['data']['nd'][n_pos])
-    #     neighbor_nodes.add(i['data']['nd'][c_pos])
-    #     neighbor_nodes.add(i['data']['nd'][p_pos])
-
-    #     neighbor_nodes.remove(i['data']['nd'][c_pos])
     print('difference of time for get_neighbors:', datetime.now() - start_time)
 
     return list(edges)
@@ -384,7 +333,6 @@ def get_edges(path):
     edges = []
 
     for i in range(len(path)):
-        print('hey ho')
         try:
             coord = []
             coord.append(path[i]['data']['id'])
@@ -436,7 +384,11 @@ def get_path(starting_node, nodes, way_edges, dist_target=0, time_target=0):
         edges = get_edges(path)
         way_edges = remove_edges(way_edges, edges)
 
-        new_leg = get_leg(current_node, nodes, way_edges)
+        neighbors = get_neighbors(current_node, way_edges)
+
+        new_leg = []
+        if len(neighbors) != 0:
+            new_leg = get_leg(current_node, nodes, way_edges)
 
         path[current_pos:current_pos] = new_leg
         
