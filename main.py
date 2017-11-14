@@ -8,11 +8,6 @@ import argparse
 import pylab as pl
 from matplotlib import collections as mc
 
-# TODO: Figure out how to output the data
-# TODO: print series of lon, lats?
-# TODO: Figure out Graphical user interface
-# TODO: Have text or something
-
 api = osmapi.OsmApi()
 
 ap = argparse.ArgumentParser()
