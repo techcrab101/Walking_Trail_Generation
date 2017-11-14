@@ -1,10 +1,8 @@
 import osmapi
 
 import math
-import time
 from itertools import groupby
 from operator import itemgetter
-from random import random
 from copy import deepcopy
 import argparse
 
