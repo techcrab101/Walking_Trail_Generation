@@ -3,7 +3,6 @@ import osmapi
 import math
 from itertools import groupby
 from operator import itemgetter
-from copy import deepcopy
 import argparse
 
 import pylab as pl
