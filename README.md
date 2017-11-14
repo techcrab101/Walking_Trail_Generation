@@ -5,7 +5,7 @@ The project was done as extra credit project for the 3012 Applied Combinatorics 
 
 Run main.py with the arguments below
 
-'''
+```
 usage: main.py [-h] [-lon LONGITUDE] [-lat LATITUDE] [-d DISTANCE] [-t TIME]
                [-w WALKING_PACE]
 
@@ -22,7 +22,7 @@ optional arguments:
                         limit)
   -w WALKING_PACE, --walking_pace WALKING_PACE
                         The walking pace in km per hour. (Default is 5)
-'''
+```
 
 The output will start as a series of prints stating the path length (in terms of how many vertices or nodes it has)
 
