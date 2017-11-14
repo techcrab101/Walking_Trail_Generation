@@ -6,7 +6,7 @@ The project was done as extra credit project for the 3012 Applied Combinatorics 
 Read the pdf to see what the project is about
 
 ## Usage
-Run main.py with the arguments below
+Run python3 main.py with the arguments below
 
 ```
 usage: main.py [-h] [-lon LONGITUDE] [-lat LATITUDE] [-d DISTANCE] [-t TIME]
